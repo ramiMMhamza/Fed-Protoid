@@ -1,0 +1,196 @@
+DATA_ROOT: '/data/Knowledge_Distilation/data/OpenUnReID/datasets/'
+DATA_ROOT_local: '/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/datasets/'  #'/data/ramih/Knowledge_Distilation/data/OpenUnReID/datasets/'
+DATA_ROOT_cluster: './data/OpenUnReID/datasets/'
+
+LOGS_ROOT: '/out/logs/'
+LOGS_ROOT_local: '/data1/projects/cvlab/logs_fedl/'
+LOGS_ROOT_cluster: './logs_fedl_rebutal/'
+
+# DATA_ROOT: './data/OpenUnReID/datasets/'
+# LOGS_ROOT: './out/logs/'
+#'/out/market/logs/'
+
+
+MODEL:
+  # architecture
+  backbone: 'resnet50'
+  backbone_path: "/data/Knowledge_Distilation/data/OpenUnReID/pretrained/resnet/resnet50-19c8e357.pth"
+  backbone_path_local: "/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/resnet/resnet50-19c8e357.pth"
+  backbone_path_cluster: "./data/OpenUnReID/pretrained/resnet/resnet50-19c8e357.pth"
+  # backbone_path: "./data/OpenUnReID/pretrained/resnet/resnet50-19c8e357.pth"
+  writer: '/out/logs_tb/'
+  pooling: 'gem'
+  embed_feat: 0
+  dropout: 0.
+
+  dsbn: True
+
+  sync_bn: True
+  samples_per_bn: 16
+
+  mean_net: True
+  alpha: 0.999
+
+  # pretraining
+  imagenet_pretrained: True
+  # source_pretrained: '/data/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_duke/logs/out/checkpoint.pth'
+  # source_pretrained: "/data/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_market/model_best.pth"
+  source_pretrained: '/data/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_msmt_1/model_best.pth'
+  # source_pretrained: '/data/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_randperson/model_best.pth'
+
+  # source_pretrained_local: '/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_duke/duke_model_best.pth'
+  # source_pretrained_local: "/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_market/model_best.pth"
+  source_pretrained_local: '/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_msmt_1/model_best.pth' #'/data/cvlab/home/logs/source_pretrain_msmt_1/model_best.pth'
+  # source_pretrained_local: '/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_randperson/model_best.pth'
+
+  # source_pretrained_cluster: './data/OpenUnReID/pretrained/source_pretrain_duke/duke_model_best.pth'
+  # source_pretrained_cluster: "./data/OpenUnReID/pretrained/source_pretrain_market/model_best.pth"
+  source_pretrained_cluster: './data/OpenUnReID/pretrained/source_pretrain_msmt_1/model_best.pth'
+  # source_pretrained_cluster: './data/OpenUnReID/pretrained/LUP/lup_moco_r50.pth'
+  # source_pretrained_cluster: '/data/cvlab/home/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_randperson/model_best.pth'
+  
+  # source_pretrained: '/data/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_duke/logs/out/checkpoint.pth'
+  # source_pretrained: './data/OpenUnReID/pretrained/source_pretrain_duke/logs/out/checkpoint.pth'
+  #'/data/OpenUnReID/pretrained/source_pretrain_duke/logs/out/checkpoint.pth'
+
+  #"./data/OpenUnReID/pretrained/source_pretrain_market/checkpoint.pth"
+  #'./data/OpenUnReID/pretrained/source_pretrain_market/checkpoint.pth'
+
+
+DATA:
+
+  height: 256
+  width: 128
+  norm_mean: [0.485, 0.456, 0.406]
+  norm_std: [0.229, 0.224, 0.225]
+
+  TRAIN:
+    # augmentation
+    is_autoaug: False
+
+    is_flip: True
+    flip_prob: 0.5
+
+    is_pad: True
+    pad_size: 10
+
+    is_blur: False
+    blur_prob: 0.5
+
+    is_erase: True
+    erase_prob: 0.5
+
+    # dual augmentation for MMT
+    is_mutual_transform: False
+    mutual_times: 2
+
+TRAIN:
+  seed: 1
+  deterministic: True
+  # mixed precision training for PyTorch>=1.6
+  amp: False
+
+ # datasets market1501
+  # datasets: {'msmt17': 'trainval'}'
+  # datasets: {'market1501': 'trainval','dukemtmcreid': 'trainval'}
+  # datasets: {'msmt17': 'trainval','dukemtmcreid': 'trainval'} #msmt17 market1501 dukemtmcreid cuhk03 cuhk03-np
+  datasets: {'market1501': 'trainval'} #,'msmt17': 'trainval'} 
+  # datasets: {'cuhk03-np': 'trainval','custom_randperson': 'train'} 
+  unsup_dataset_indexes: [0,]
+  sup_dataset_indexes : [1,]
+  filtre: [True,False]
+
+  epochs: 3 #10
+  iters: 50 #120 now iters = Ic/4*n°gpus
+  times_itc: 0
+
+
+  LOSS:
+    # losses: {'cross_entropy': 0.5, 'soft_entropy': 0.5, 'softmax_triplet': 0.2, 'soft_softmax_triplet': 0.8,  'kd_loss': 0.01, 'MMD_loss': 0.03} 
+    losses: {'cross_entropy': 0.5, 'soft_entropy': 0.5, 'softmax_triplet': 0.2, 'soft_softmax_triplet': 0.8, 'MMD_loss': 0.1} # market to msmt 
+    # losses: {'cross_entropy': 0.5, 'soft_entropy': 0.5, 'softmax_triplet': 0.2, 'soft_softmax_triplet': 0.8} #,, 'kl_loss': 0.5 'kd_loss': 0., 'MMD_loss' : 0.0
+    margin: 0.
+
+  # validate
+  val_dataset: 'market1501' #'market1501' #'dukemtmcreid' #'' 
+  val_freq: 2
+
+  # sampler
+  SAMPLER:
+    num_instances: 4
+    is_shuffle: True
+
+  # data loader
+  LOADER:
+    samples_per_gpu: 16 #16 #32
+    workers_per_gpu: 0 #2 #4
+
+  # pseudo labels
+  PSEUDO_LABELS:
+    freq: 10000 # epochs
+    use_outliers: False
+    norm_feat: True
+    norm_center: True
+
+    cluster: 'dbscan'
+    eps: [0.7,] #0.7
+    min_samples: 4 # for dbscan
+    dist_metric: 'jaccard'
+    k1: 30 # for jaccard distance
+    k2: 6 # for jaccard distance
+    search_type: 0 # 0,1,2 for GPU, 3 for CPU (work for faiss)
+    cluster_num: null
+    mode: 'coupled_sigmoid'  # 'only_source' 'coupled_1st_epoch_only_source' 'coupled_linear_on_source' 'coupled_linear'  
+    lambda_: 2
+    weighted_clustering: False
+    # cluster: 'kmeans'
+    # cluster_num: [500,]
+    # dist_cuda: True
+
+  # optim
+  OPTIM:
+    optim: 'adam'
+    lr: 0.00035
+    weight_decay: 0.0005
+
+  SCHEDULER:
+    # lr_scheduler:  'linear' #'single_step' #"linear" #'single_step' Default:'cosine' 'linear'warmup_multi_step  single_step : for offline learning
+    # stepsize: 20 # for single_step & warmup_multi_step
+    # gamma: 0.1 # for single_step & warmup_multi_step
+    # max_epoch: 5 #for cosine
+    # n_epochs_init: 2 # for linear
+    # n_epochs_decay: 10 #10 # " for linear"
+
+    lr_scheduler: null
+
+
+TEST:
+  # datasets
+  datasets: ['msmt17','market1501'] #['dukemtmcreid'] # market1501# cuhk03-np
+
+  # data loader
+  LOADER:
+    samples_per_gpu: 32
+    workers_per_gpu: 2
+
+  # ranking setting
+  dist_metric: 'euclidean'
+  norm_feat: True
+  dist_cuda: True
+
+  # post processing
+  rerank: False
+  search_type: 0 # 0,1,2 for GPU, 3 for CPU (work for faiss)
+  k1: 20
+  k2: 6
+  lambda_value: 0.3
+ # visualization top k rank and activations
+  visrankactiv: True
+
+
+FED:
+  client_sizes: {'cuhk03-np':[3607,3761],'market1501':[2017,1709,2707,920,2338,3245],'msmt17':[4910,203,454,1614,4296,1678,3453,795,1396,655,3154,1364,3635,3876,1138]} # S_C
+  num_cameras: {'market1501': 6,'msmt17': 15,'cuhk03-np': 2}
+  mmd_start_round: True # False starting from second round
+  fed_opt: "fedavg" # "fedfix"fedavg
+  # weights: [0.71,0.072,0.057,0.02,0.06,0.037,0.044] # S_M
