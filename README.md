@@ -45,16 +45,16 @@ sbatch Fedprotoid.sh
 ```
 + Distributed training locally with multiple GPUs:
 ```shell
-sh run_train.sh ${RUN_NAME} --epochs 10 --iters 120 --KDloss 0.1 --MMDloss 0.1 
+sh run_train.sh ${RUN_NAME} --epochs_s 1 --iters_s 0 --epochs_t 1 --times_itc 10
 ```
 ## Arguments
 + `RUN_NAME`: the name of the experiment. Logs and checkpoints will be saved in `logs/${RUN_NAME}/`.
-+ `--epochs`: the number of training epochs.
-+ `--iters`: the number of training iterations.
-+ `--KDloss`: the weight of the knowledge distillation loss.
-+ `--MMDloss`: the weight of the MMD loss.
-+ Refer to run_s2p_train.sh for more arguments. METHOD can be MMT or SpCL.
-+ [optional arguments]: please refer to [config.yaml](OpenUnReID/tools/MMT/config.yaml) to modify some key values from the loaded config of the specified method (Support MMT and SpCL).
++ `--epochs_s`: the number of source's training epochs.
++ `--iters_s`: the number of source's training iterations.
++ `--epochs_t`: the number of client's training epochs.
++ `--times_itc`: The number of iterations per round.
++ Refer to run_train.sh for more arguments. METHOD can be "FEDPROTO" or "FEDPROTO++".
++ [optional arguments]: please refer to [config.yaml](OpenUnReID/tools/FEDPROTO/config.yaml) to modify some key values from the loaded config of the specified method.
 
 ## Datasets
 
