@@ -17,7 +17,7 @@ eval "$(conda shell.bash hook)"
 conda init bash
 conda activate fedreid
 echo 'Virtual environment activated'
-./run_cmd_train.sh FEDTRANSREID_M_S_test_a40 --epochs_s 1 --iters_s 0 --epochs_t 1 --iters_t 0 --times_itc 10
+./run_cmd_train.sh FEDPROTOREID_S_M --epochs_s 1 --iters_s 0 --epochs_t 1 --iters_t 0 --times_itc 10
 wait
 conda deactivate
 echo 'python scripts have finished'

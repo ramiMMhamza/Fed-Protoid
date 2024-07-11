@@ -26,7 +26,7 @@ do
 done
 # echo $@
 python3 -m torch.distributed.launch --nproc_per_node=$GPUS --master_port=$PORT --use_env \
-./cvlab-federated-phd/OpenUnReID/tools/$METHOD/main_fedl.py ./FedProtoid/OpenUnReID/tools/$METHOD/config.yaml --work-dir=${WORK_DIR} \
+./cvlab-federated-phd/OpenUnReID/tools/$METHOD/main_fedl_init.py ./FedProtoid/OpenUnReID/tools/$METHOD/config.yaml --work-dir=${WORK_DIR} \
     --launcher="pytorch" --tcp-port=${PORT}  --exec=2. ${@:2}
 
 for i in {1..800}

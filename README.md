@@ -30,7 +30,7 @@ For more details, please refer to our [paper]().
 
 # [Updates](#contents)
 
-[10/07/2024] `S2P` v0.1.0 is released.
+[10/07/2024] `Fed-Protoid` v0.1.0 is released.
 
 # [Installation](#contents)
 
@@ -38,7 +38,7 @@ Please refer to [INSTALL.md](OpenUnReID/docs/INSTALL.md) for installation and da
 
 # [Get Started](#contents)
 ## Training
-To train S2P on MSMT17 as source domain and Market1501 as target domain, run the following command:
+To train Fed-Protoid on MSMT17 as source domain and Market1501 as target domain, run the following command:
 + Distributed training in a slurm cluster:
 ```shell
 sbatch Fedprotoid.sh
