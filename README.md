@@ -1,4 +1,4 @@
-# Source Guided Similarity Preservation (S2P)
+# Privacy-Preserving Adaptive Re-Identification without Image Transfer (Fed-Protoid)
 This repository contains the code for the paper "Privacy-Preserving Adaptive Re-Identification without Image Transfer" (ECCV 2024).
 
 # [Overview](#contents)
