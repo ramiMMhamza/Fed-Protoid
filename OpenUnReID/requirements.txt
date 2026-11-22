@@ -1,16 +1,19 @@
+# PyTorch and faiss are deliberately not pinned here: install the builds that
+# match your CUDA version first (see docs/INSTALL.md).
+#   torch>=1.10, torchvision
+#   faiss-gpu (conda) or faiss-cpu
 numpy
-sklearn
+scipy
+scikit-learn
 Cython
 h5py
-pyzmq
-tornado
-pillow-simd
+pillow
 six
-scipy
 opencv-python
 matplotlib
-faiss-gpu==1.6.3
+pandas
 easydict
 pyyaml
 requests
 multiprocess
+tensorboard

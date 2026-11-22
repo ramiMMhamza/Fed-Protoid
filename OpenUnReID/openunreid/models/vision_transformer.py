@@ -20,7 +20,9 @@ for some einops/einsum fun
 
 Hacked together by / Copyright 2020 Ross Wightman
 """
+import copy
 import math
+import warnings
 from functools import partial
 from itertools import repeat
 

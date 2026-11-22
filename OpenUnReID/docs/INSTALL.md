@@ -2,51 +2,40 @@
 
 ### Requirements
 
-+ Linux (Windows is not officially supported)
-+ Python 3.5+
-+ PyTorch 1.1 or higher
-+ CUDA 9.0 or higher
++ Linux
++ Python 3.10 or newer
++ PyTorch 1.10 or higher, with CUDA (the training scripts only run on GPU)
++ faiss (`faiss-gpu`, or `faiss-cpu` together with `search_type: 3` in the config)
 
-We have tested the following versions of OS and softwares:
+The code base was developed with Python 3.10. The package installation and the
+CPU-only parts (data pipeline, clustering, evaluation metric) were also checked
+with Python 3.13, PyTorch 2.15 and NumPy 2.5.
 
-+ OS: Ubuntu 16.04
-+ Python: 3.6/3.7
-+ PyTorch: 1.1/1.5/1.6
-+ CUDA: 9.0/11.0
-
-### Install OpenUnReID
+### Install
 
 **a.** Create a conda virtual environment and activate it.
 ```shell
-conda create -n open-mmlab python=3.7 -y
-conda activate open-mmlab
+conda create -n fedprotoid python=3.10 -y
+conda activate fedprotoid
 ```
 
-**b.** Install PyTorch and torchvision following the [official instructions](https://pytorch.org/), e.g.,
+**b.** Install PyTorch and torchvision following the [official instructions](https://pytorch.org/).
+
+**c.** Install faiss.
 ```shell
-conda install pytorch torchvision -c pytorch
+conda install -c pytorch faiss-gpu   # or: pip install faiss-cpu
 ```
 
-**c.** Clone the this repository.
+**d.** Install the dependent libraries and the `openunreid` package (run from the repository root).
 ```shell
-git clone https://github.com/open-mmlab/OpenUnReID.git
-cd OpenUnReID
-```
-
-**d.** Install the dependent libraries.
-```shell
-pip install -r requirements.txt
-```
-
-**e.** Install `openunreid` library.
-```shell
-python setup.py develop
+pip install -r OpenUnReID/requirements.txt
+pip install -e OpenUnReID
 ```
 
 
 ### Prepare datasets
 
-It is recommended to symlink your dataset root to `OpenUnReID/datasets`. If your folder structure is different, you may need to change the corresponding paths (namely `DATA_ROOT`) in config files.
+Datasets are read from `DATA_ROOT` (`./data/datasets/` by default, relative to the repository root). It is recommended to symlink your dataset root there, or to pass `--data-root` to the training scripts.
 
 Download the datasets from
 + DukeMTMC-reID: [[Google Drive]](https://drive.google.com/file/d/1jjE85dRCMOgRtvJ5RQV9-Afs-2_5dY3O/view) [[Baidu Pan]](https://pan.baidu.com/share/init?surl=jS0XM7Var5nQGcbf9xUztw) (password: bhbh)
@@ -59,7 +48,7 @@ Download the datasets from
 
 Save them under
 ```shell
-OpenUnReID
+data
 └── datasets
     ├── dukemtmcreid
     │   └── DukeMTMC-reID

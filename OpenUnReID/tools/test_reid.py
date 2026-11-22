@@ -71,7 +71,7 @@ def main():
 
     # build model
     model = build_model(
-        cfg, 0
+        cfg, 0, []
     )  # use num_classes=0 since we do not need classifier for testing
     model.cuda()
 
@@ -96,7 +96,9 @@ def main():
             continue
 
         print("==> Test with {}".format(key))
-        copy_state_dict(state_dict[key], model)
+        # checkpoints are saved from a (Distributed)DataParallel wrapper
+        strip = None if hasattr(model, "module") else "module."
+        copy_state_dict(state_dict[key], model, strip=strip)
 
         # start testing
         for i, (loader, query, gallery) in enumerate(

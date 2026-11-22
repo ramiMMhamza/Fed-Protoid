@@ -105,6 +105,7 @@ def extract_features(
     else:
         return features_dict
 
+@torch.no_grad()
 def extract_features_protos(
     model,  # model used for extracting
     data_loader,  # loading data
@@ -116,17 +117,19 @@ def extract_features_protos(
     save_memory=False,  # gather features from different GPUs all together or in sequence, only for distributed  # noqa
     for_testing=True,
     prefix="Extract: ",
-    visrankactiv=False,
-    protos=False
+    **kwargs,
 ):
- 
- 
+    """Extract the features used to build the source prototypes.
+
+    Returns ``(features, raw_features)``: ``raw_features`` is the output of the
+    model in eval mode, ``features`` the same tensor L2-normalised when
+    ``normalize`` is True. With ``with_path=True`` only the ``{path: feature}``
+    dict of ``features`` is returned.
+    """
     progress = Meters({"Time": ":.3f", "Data": ":.3f"}, len(data_loader), prefix=prefix)
 
     rank, world_size, is_dist = get_dist_info()
-    features = []
-    activations = []
-    protos_ = []
+    features, raw_features = [], []
     model.eval()
     data_iter = iter(data_loader)
 
@@ -138,72 +141,39 @@ def extract_features_protos(
         if cuda:
             images = images.cuda()
 
-        # compute output
         outputs = model(images)
-        protos = model(images, return_featuremaps=False, protos=True)
-
         if isinstance(outputs, list) and for_testing:
             outputs = torch.cat(outputs, dim=1)
-            protos = torch.cat(protos, dim=1)
-
+        raw = outputs
         if normalize:
-            if isinstance(outputs, list):
-                outputs = [F.normalize(out, p=2, dim=-1) for out in outputs]
-                # protos = [F.normalize(out, p=2, dim=-1) for out in protos]
             outputs = F.normalize(outputs, p=2, dim=-1)
-            # protos = F.normalize(protos, p=2, dim=-1)
 
-        if isinstance(outputs, list):
-            outputs = torch.cat(outputs, dim=1).data.cpu()
-            protos = torch.cat(outputs, dim=1).data.cpu()
-        else:
-            outputs = outputs.data.cpu()
-            protos = protos.data.cpu()
-        
-        features.append(outputs)
-        protos_.append(protos)
+        features.append(outputs.data.cpu())
+        raw_features.append(raw.data.cpu())
 
-        # measure elapsed time
         progress.update({"Time": time.time() - end})
         end = time.time()
-
         if i % print_freq == 0:
             progress.display(i)
 
     synchronize()
+    features = torch.cat(features)
+    raw_features = torch.cat(raw_features)
     if is_dist and cuda:
         # distributed: gather features from all GPUs
-        features = torch.cat(features)
-        all_features = all_gather_tensor(features.cuda(), save_memory=save_memory)
-        all_features = all_features.cpu()[: len(dataset)]
+        features = all_gather_tensor(features.cuda(), save_memory=save_memory).cpu()
+        raw_features = all_gather_tensor(raw_features.cuda(), save_memory=save_memory).cpu()
+    features = features[: len(dataset)]
+    raw_features = raw_features[: len(dataset)]
 
-        protos_ = torch.cat(protos_)
-        all_protos_ = all_gather_tensor(protos_.cuda(), save_memory=save_memory)
-        all_protos_ = all_protos_.cpu()[: len(dataset)]
-
-    else:
-        # no distributed, no gather
-        all_features = torch.cat(features, dim=0)[: len(dataset)]
-        all_protos_ = torch.cat(protos_, dim=0)[: len(dataset)]
-        if visrankactiv:
-            all_activations = torch.cat(activations, dim=0)[:len(dataset)]
-            
     if not with_path:
-        if visrankactiv:
-            return all_features, all_activations
-        else:
-            return all_features, all_protos_
+        return features, raw_features
 
     features_dict = OrderedDict()
-    for fname, feat in zip(dataset, all_features):
+    for fname, feat in zip(dataset, features):
         features_dict[fname[0]] = feat
-    if visrankactiv:
-        activations_dict = OrderedDict()
-        for fname, activ in zip(dataset, all_activations):
-            activations_dict[fname[0]] = activ
-        return features_dict, activations_dict
-    else:
-        return features_dict
+    return features_dict
+
 
 def extract_features_for_similarities(
     model,  # model used for extracting

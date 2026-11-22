@@ -62,8 +62,8 @@ def cfg_from_yaml_file(cfg_file, config):
             new_config = yaml.load(f)
         config.update(EasyDict(new_config))
 
-    cfg.DATA_ROOT = Path(cfg.DATA_ROOT)
-    cfg.LOGS_ROOT = Path(cfg.LOGS_ROOT)
+    config.DATA_ROOT = Path(config.DATA_ROOT)
+    config.LOGS_ROOT = Path(config.LOGS_ROOT)
 
     return config
 
