@@ -1,0 +1,5 @@
+# setup.py imports numpy and Cython to build the rank_cy extension, so they
+# have to be available in the isolated build environment.
+[build-system]
+requires = ["setuptools>=61", "wheel", "Cython", "numpy"]
+build-backend = "setuptools.build_meta"

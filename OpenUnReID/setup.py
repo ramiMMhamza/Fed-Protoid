@@ -52,19 +52,8 @@ def get_git_hash():
 
 
 def get_hash():
-    if os.path.exists(".git"):
-        sha = get_git_hash()[:7]
-    elif os.path.exists(version_file):
-        try:
-            from openunreid.version import __version__  # noqa
-
-            sha = __version__.split("+")[-1]
-        except ImportError:
-            raise ImportError("Unable to get git version")
-    else:
-        sha = "unknown"
-
-    return sha
+    # works from a sub-directory of the repository; "unknown" outside of git
+    return get_git_hash()[:7] or "unknown"
 
 
 def write_version_py():
@@ -81,9 +70,11 @@ short_version = '{}'
 
 
 def get_version():
+    # exec() no longer writes into the function locals on Python >= 3.13
+    namespace = {}
     with open(version_file, "r") as f:
-        exec(compile(f.read(), version_file, "exec"))
-    return locals()["__version__"]
+        exec(compile(f.read(), version_file, "exec"), namespace)
+    return namespace["__version__"]
 
 
 def numpy_include():
@@ -106,8 +97,9 @@ ext_modules = [
 def get_requirements(filename="requirements.txt"):
     here = osp.dirname(osp.realpath(__file__))
     with open(osp.join(here, filename), "r") as f:
-        requires = [line.replace("\n", "") for line in f.readlines()]
-    return requires
+        lines = [line.strip() for line in f.readlines()]
+    # skip blank lines and comments
+    return [line for line in lines if line and not line.startswith("#")]
 
 
 if __name__ == "__main__":
