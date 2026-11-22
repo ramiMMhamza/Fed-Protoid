@@ -2,12 +2,11 @@ from torch.utils.tensorboard import SummaryWriter
 import argparse
 import shutil
 import sys
+import warnings
 import time
 from datetime import timedelta
 from pathlib import Path
-import tensorflow as tf
 from sklearn import manifold
-import tensorboard as tb
 import torch, torchvision
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,33 +37,7 @@ import copy
 import io
 import collections
 from torch.utils.data import TensorDataset, DataLoader
-# tf.io.gfile = tb.compat.tensorflow_stub.io.gfile
-def add_model(model_1, model_2, w_1, w_2):
-    if model_1 == None:
-        params2 = model_2.named_parameters()
-        dict_params2 = dict(params2)
-        with torch.no_grad():
-            for name2 in dict_params2:
-                dict_params2[name2].set_(dict_params2[name2].data*w_2)
-        return model_2
-    params1 = model_1.named_parameters()
-    params2 = model_2.named_parameters()
-    dict_params2 = dict(params2)
-    with torch.no_grad():
-        for name1, param1 in params1:
-            if name1 in dict_params2 and ("clas" not in name1):
-                dict_params2[name1].set_(param1.data*w_1 + dict_params2[name1].data*w_2)
-    return model_2
-
-def aggregate_models (models,weights_fed_avg=None,beta=0.2):
-    alpha = len(models)
-    model = add_model(None, models[0], 0, beta) #1/alpha*
-    for i in range(1,len(models)):
-        if weights_fed_avg is None:
-            model = add_model(model, models[i], 1, ((1-beta)/(alpha-1))) #((1-beta)/(alpha-1))
-        else:
-            model = add_model(model, models[i], 1, ((1-beta)*(weights_fed_avg[i-1])))
-    return model
+from openunreid.fed import aggregate_models
 def gen_plot(Y,color):
     """Create a pyplot plot and save to buffer."""
     plt.figure(figsize=(15,8))
@@ -157,13 +130,7 @@ class MMTRunner(BaseRunner):
         meters = {}
         for key in self.criterions.keys():
             if key == "soft_entropy":
-                loss = self.criterions[key](
-                    results_1, results_1_mean
-                )[0] #+ self.criterions[key](results_2, results_1_mean)[0]
-                loss_vec = self.criterions[key](
-                    results_1, results_1_mean
-                )[1] #+ self.criterions[key](results_2, results_1_mean)[1]
-                #print("loss vec {}".format(loss_vec))
+                loss = self.criterions[key](results_1, results_1_mean)[0]
             elif key == "soft_softmax_triplet":
                 loss = self.criterions[key](
                         results_1, targets, results_1_mean
@@ -194,16 +161,19 @@ class MMTRunner(BaseRunner):
             total_loss += loss * float(self.cfg.TRAIN.LOSS.losses[key])   
             meters[key] = loss.item()
         
-        self.losses.append(total_loss)
-       
+        # keep a float, not the tensor: the tensor holds the whole autograd graph
+        self.losses.append(total_loss.item())
+
         acc_1 = accuracy(results_1["prob"].data, targets.data)
-        meters["Acc@1"] = acc_1[0] 
+        meters["Acc@1"] = acc_1[0]
         self.accs.append(meters["Acc@1"])
-        if (iter==self.cfg.TRAIN.iters-1) & (self._rank==0):
-            t_loss = sum(self.losses)/len(self.losses)
-            acc_ = sum(self.accs)/len(self.accs)
-            self.writer.add_scalar("TRAIN/Acc/"+str(task_id),acc_,self._epoch)
-            self.writer.add_scalar("TRAIN/Total_loss/"+str(task_id),t_loss,self._epoch)
+        if iter == self.cfg.TRAIN.iters - 1:
+            if self._rank == 0:
+                t_loss = sum(self.losses)/len(self.losses)
+                acc_ = sum(self.accs)/len(self.accs)
+                self.writer.add_scalar("TRAIN/Acc/"+str(task_id),acc_,self._epoch)
+                self.writer.add_scalar("TRAIN/Total_loss/"+str(task_id),t_loss,self._epoch)
+            # reset on every rank, otherwise the lists grow forever on ranks > 0
             self.losses = []
             self.accs = []
         self.train_progress.update(meters)
@@ -231,7 +201,21 @@ def parge_config():
     parser.add_argument("--iters_t", type=int, default=0)
     parser.add_argument("--times_itc", type=int, default=0)
 
-    parser.add_argument("--exec", type=float) #if 0 then local, 1 fastml, and 2 Telecom Cluster
+    parser.add_argument(
+        "--config-source",
+        help="config of the source (server) model, "
+        "default: config_s.yaml next to the train config",
+    )
+    parser.add_argument("--data-root", help="override DATA_ROOT")
+    parser.add_argument("--logs-root", help="override LOGS_ROOT")
+    parser.add_argument(
+        "--backbone-path", help="override MODEL.backbone_path (ImageNet weights)"
+    )
+    parser.add_argument(
+        "--source-pretrained",
+        help="override MODEL.source_pretrained (source-domain checkpoint)",
+    )
+    parser.add_argument("--exec", type=float, help="deprecated and ignored")
     parser.add_argument(
         "--set",
         dest="set_cfgs",
@@ -241,14 +225,9 @@ def parge_config():
     )
     args = parser.parse_args()
     cfg_from_yaml_file(args.config, cfg)
-    try:
-        # cfg_from_yaml_file("./fedl/data/OpenUnReID/tools/FEDPROTO/config_s.yaml", cfg_s)
-        cfg_from_yaml_file("./cvlab-federated-phd/OpenUnReID/tools/FEDPROTO/config_s.yaml", cfg_s)
-    except:
-        try: 
-            cfg_from_yaml_file("./fedl/data/OpenUnReID/tools/FEDPROTO/config_s.yaml", cfg_s)
-        except:
-            cfg_from_yaml_file("/exp/OpenUnReID/tools/FEDPROTO/config_s.yaml", cfg_s)
+    if not args.config_source:
+        args.config_source = Path(args.config).with_name("config_s.yaml")
+    cfg_from_yaml_file(args.config_source, cfg_s)
     # assert cfg.TRAIN.PSEUDO_LABELS.use_outliers
     cfg.launcher = args.launcher
     cfg.tcp_port = args.tcp_port
@@ -270,33 +249,23 @@ def parge_config():
     cfg.TRAIN.times_itc = args.times_itc
     if args.MMDloss>0:
         cfg.TRAIN.LOSS.losses["MMD_loss"] = args.MMDloss #else refer to config.yaml
-    cfg.exec = args.exec
-    cfg_s.exec = args.exec
-    if cfg.exec==0:
-        print("Training locally on naboo")
-        cfg.DATA_ROOT = Path(cfg.DATA_ROOT_local)
-        cfg.LOGS_ROOT = Path(cfg.LOGS_ROOT_local)
-        cfg.MODEL.backbone_path = cfg.MODEL.backbone_path_local
-        cfg.MODEL.source_pretrained = cfg.MODEL.source_pretrained_local
-
-        cfg_s.DATA_ROOT = Path(cfg_s.DATA_ROOT_local)
-        cfg_s.LOGS_ROOT = Path(cfg_s.LOGS_ROOT_local)
-        cfg_s.MODEL.backbone_path = cfg_s.MODEL.backbone_path_local
-        cfg_s.MODEL.source_pretrained = cfg_s.MODEL.source_pretrained_local
-    elif cfg.exec==2:
-        print("training on Telecom Cluster")
-        cfg.DATA_ROOT = Path(cfg.DATA_ROOT_cluster)
-        cfg.LOGS_ROOT = Path(cfg.LOGS_ROOT_cluster)
-        cfg.MODEL.backbone_path = cfg.MODEL.backbone_path_cluster
-        cfg.MODEL.source_pretrained = cfg.MODEL.source_pretrained_cluster
-
-        cfg_s.DATA_ROOT = Path(cfg_s.DATA_ROOT_cluster)
-        cfg_s.LOGS_ROOT = Path(cfg_s.LOGS_ROOT_cluster)
-        cfg_s.MODEL.backbone_path = cfg_s.MODEL.backbone_path_cluster
-        cfg_s.MODEL.source_pretrained = cfg_s.MODEL.source_pretrained_cluster
-
-    else:
-        print("training on fastml")
+    if args.exec is not None:
+        warnings.warn(
+            "--exec is deprecated and ignored: set the paths in the config files "
+            "or use --data-root, --logs-root, --backbone-path and "
+            "--source-pretrained."
+        )
+    for config in (cfg, cfg_s):
+        if args.data_root:
+            config.DATA_ROOT = args.data_root
+        if args.logs_root:
+            config.LOGS_ROOT = args.logs_root
+        if args.backbone_path:
+            config.MODEL.backbone_path = args.backbone_path
+        if args.source_pretrained:
+            config.MODEL.source_pretrained = args.source_pretrained
+        config.DATA_ROOT = Path(config.DATA_ROOT)
+        config.LOGS_ROOT = Path(config.LOGS_ROOT)
     if not args.work_dir:
         args.work_dir = Path(args.config).stem
     cfg.work_dir = cfg.LOGS_ROOT / args.work_dir
@@ -314,15 +283,15 @@ def main():
     # init distributed training
     args, cfg = parge_config()
     dist = init_dist(cfg)
+    set_random_seed(cfg.TRAIN.seed, cfg.TRAIN.deterministic)
+    # init_dist() fills the device information in cfg only
+    for key in ("total_gpus", "gpu", "world_size"):
+        if key in cfg:
+            cfg_s[key] = cfg[key]
     rank,_,_ = get_dist_info()
     print(rank)
     if rank == 0:
-        if cfg.exec==0:
-            writer = SummaryWriter(cfg.work_dir / 'logs_tb/',flush_secs=10)
-        elif cfg.exec==2:
-            writer = SummaryWriter(cfg.work_dir / 'logs_tb/',flush_secs=10)
-        else:
-            writer = SummaryWriter('/out/logs_tb/'+str(cfg.TRAIN.LOSS.losses["MMD_loss"])+'/',flush_secs=10)
+        writer = SummaryWriter(cfg.work_dir / 'logs_tb/',flush_secs=10)
     else :
         writer = None
     
@@ -432,7 +401,7 @@ def main():
         memory_poolings = []
         for idx, (loader, dataset) in enumerate(zip(loaders, datasets)):
             features, poolings = extract_features_protos(
-                models_1[0], loader, dataset, with_path=False, prefix="Extract: ",
+                models_1[0], loader, dataset, normalize=False, with_path=False, prefix="Extract: ",
             )
             assert features.size(0) == len(dataset)
             # if idx in cfg.TRAIN.unsup_dataset_indexes:
@@ -478,7 +447,6 @@ def main():
             train_loaders[i],
             writer,
             train_sets=train_setss[i],
-            # train_loader_target=train_loader_target[0],
             lr_scheduler=lr_schedulers[i],
             reset_optim=True,
         )
@@ -491,7 +459,6 @@ def main():
             train_loaders[i],
             writer,
             train_sets=train_setss[i],
-            # train_loader_target=train_loader_target[0],
             lr_scheduler=lr_schedulers[i],
             reset_optim=True,
             protos_dataloader=protos_dataloader,
@@ -547,7 +514,12 @@ def main():
     else:
         raise NotImplementedError("only support fedavg and fedfix")
 
-    model_0_net_agg = aggregate_models(models_0_net, weights_fed_avg) #, cfg.FED.weights[models_0_net[0]]
+    model_0_net_agg = aggregate_models(
+        models_0_net,
+        weights_fed_avg,
+        alpha=cfg.FED.get("alpha", 0.2),
+        average_buffers=cfg.FED.get("aggregate_bn_stats", True),
+    )
     
     runner_agg = MMTRunner(
             cfg,

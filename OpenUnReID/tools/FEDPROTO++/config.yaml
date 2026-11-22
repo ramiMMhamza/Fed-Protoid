@@ -1,24 +1,15 @@
-DATA_ROOT: '/data/ramih/Knowledge_Distilation/data/OpenUnReID/datasets/'
-DATA_ROOT_local: '/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/datasets/'  #'/data/ramih/Knowledge_Distilation/data/OpenUnReID/datasets/'
-DATA_ROOT_cluster: './data/OpenUnReID/datasets/'
-
-LOGS_ROOT: '/out/logs/'
-LOGS_ROOT_local: '/data1/projects/cvlab/logs_fedl/'
-LOGS_ROOT_cluster: './logs_fedl/'
-
-# DATA_ROOT: './data/OpenUnReID/datasets/'
-# LOGS_ROOT: './out/logs/'
-#'/out/market/logs/'
-
+# Paths are resolved from the directory the training is launched from
+# (the repository root when using run_train.sh). They can be overridden on
+# the command line with --data-root, --logs-root, --backbone-path and
+# --source-pretrained. See README.md for the expected layout.
+DATA_ROOT: './data/datasets/'
+LOGS_ROOT: './logs/'
 
 MODEL:
   # architecture
   backbone: 'resnet50'
-  backbone_path: "/data/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/resnet/resnet50-19c8e357.pth"
-  backbone_path_local: "/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/resnet/resnet50-19c8e357.pth"
-  backbone_path_cluster: "./data/OpenUnReID/pretrained/resnet/resnet50-19c8e357.pth"
-  # backbone_path: "./data/OpenUnReID/pretrained/resnet/resnet50-19c8e357.pth"
-  writer: '/out/logs_tb/'
+  # ImageNet weights of the backbone (torchvision resnet50-19c8e357.pth)
+  backbone_path: './data/pretrained/resnet50-19c8e357.pth'
   pooling: 'gem'
   embed_feat: 0
   dropout: 0.
@@ -33,34 +24,8 @@ MODEL:
 
   # pretraining
   imagenet_pretrained: True
-  # source_pretrained: '/data/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_duke/logs/out/checkpoint.pth'
-  # source_pretrained: "/data/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_market/model_best.pth"
-  # source_pretrained: '/data/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_msmt_1/model_best.pth'
-  # source_pretrained: '/data/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/LUP/vit_base_ics_cfs_lup.pth'
-  # source_pretrained: '/data/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_randperson/model_best.pth'
-
-  # source_pretrained_local: '/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_duke/duke_model_best.pth'
-  # source_pretrained_local: "/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_market/model_best.pth"
-  # source_pretrained_local: '/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_msmt_1/model_best.pth' #'/data/cvlab/home/logs/source_pretrain_msmt_1/model_best.pth'
-  # source_pretrained_local: '/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/LUP/vit_base_ics_cfs_lup.pth' #'/data/cvlab/home/logs/source_pretrain_msmt_1/model_best.pth'
-  # source_pretrained_local: '/data1/datasets/cvlab/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_randperson/model_best.pth'
-
-  # source_pretrained_cluster: './data/OpenUnReID/pretrained/source_pretrain_duke/duke_model_best.pth'
-  # source_pretrained_cluster: "./data/OpenUnReID/pretrained/source_pretrain_market/model_best.pth"
-  # source_pretrained_cluster: './data/OpenUnReID/pretrained/source_pretrain_msmt_1/model_best.pth'
-  # source_pretrained_cluster: './data/OpenUnReID/pretrained/LUP/vit_small_ics_cfs_lup.pth'
-  # source_pretrained_cluster: './data/OpenUnReID/pretrained/LUP/vit_base_ics_cfs_lup.pth'
-  # source_pretrained_cluster: './data/OpenUnReID/pretrained/MSMT/transformer_MSMT_120_B.pth'
-  source_pretrained_cluster: './data/OpenUnReID/pretrained/MSMT/transformer_MSMT_120_S.pth'
-  # source_pretrained_cluster: './data/OpenUnReID/pretrained/LUP/transformer_MSMT_120_S.pth'
-  # source_pretrained_cluster: '/data/cvlab/home/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_randperson/model_best.pth'
-  
-  # source_pretrained: '/data/ramih/Knowledge_Distilation/data/OpenUnReID/pretrained/source_pretrain_duke/logs/out/checkpoint.pth'
-  # source_pretrained: './data/OpenUnReID/pretrained/source_pretrain_duke/logs/out/checkpoint.pth'
-  #'/data/OpenUnReID/pretrained/source_pretrain_duke/logs/out/checkpoint.pth'
-
-  #"./data/OpenUnReID/pretrained/source_pretrain_market/checkpoint.pth"
-  #'./data/OpenUnReID/pretrained/source_pretrain_market/checkpoint.pth'
+  # ViT pre-trained on the labelled source domain (tools/source_pretrain/config_vit.yaml)
+  source_pretrained: './data/pretrained/source_pretrain_msmt17_vit/model_best.pth'
 
 
 DATA:
@@ -198,7 +163,9 @@ FED:
   client_sizes: {'cuhk03-np':[3607,3761],'market1501':[2017,1709,2707,920,2338,3245],'msmt17':[4910,203,454,1614,4296,1678,3453,795,1396,655,3154,1364,3635,3876,1138]} # S_C
   num_cameras: {'market1501': 6,'msmt17': 15,'cuhk03-np': 2}
   mmd_start_round: True # False starting from second round
-  fed_opt: "fedavg" # "fedfix"fedavg
+  fed_opt: "fedavg" # "fedavg": w_i = N_i / sum(N), "fedfix": w_i = 1 / n
+  alpha: 0.2 # weight of the source (pseudo-client) model in the aggregation, Eq. (2)
+  aggregate_bn_stats: True # average the BatchNorm running statistics too (False: those of the last client)
   # weights: [0.71,0.072,0.057,0.02,0.06,0.037,0.044] # S_M
 
 TRANSREID:
