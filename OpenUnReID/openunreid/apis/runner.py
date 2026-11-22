@@ -21,6 +21,7 @@ from ..core.label_generators import LabelGenerator
 from ..core.metrics.accuracy import accuracy
 from ..data import build_train_dataloader, build_val_dataloader, build_test_dataloader
 from ..data.utils.data_utils import save_image
+from ..models.vision_transformer import resize_pos_embed
 from ..utils import bcolors
 from ..utils.dist_utils import get_dist_info, synchronize
 from ..utils.meters import Meters
@@ -292,46 +293,7 @@ class BaseRunner(object):
         # if self._epoch==20:
         #     np.save('../features_clustering/features_task_3_'+str(self._epoch)+'.npy',{'source' : all_features_source,'target' : all_features, 'dist': dist})
         #     # sys.exit()
-        tsne = False
-        if tsne:
-            tsne = manifold.TSNE(n_components=2, init='pca',
-                                         random_state=0)
-            # np.save('../features/features_task_1'+str(self._epoch)+'.npy',{'source' : all_features_source,'target' : all_features, 'dist': dist})
-            # np.save('../features/distance'+str(self._epoch)+'npy',)
-
-            features = tsne.fit_transform(torch.cat((all_features,all_features_source),0))
-            # features = np.concatenate((tsne.fit_transform(all_features),tsne.fit_transform(all_features_source)),0)
-            Y = features[:len(all_features)]
-            Y_source = features[len(all_features):]
-            # pseudo_labels_ = pseudo_labels[0]+[-1]*len(all_features_source)
-            # Y = torch.cat((all_features,all_features_source),0)
-            plot = gen_plot(Y,Y_source,pseudo_labels[0],list_clusters,self.y_true[int(self.cfg.task_id)])
-            # print(Y)
-            image = PIL.Image.open(plot)
-            image = ToTensor()(image)
-            # self.writer.add_image('tsne on clustered features'+str(self._epoch),image,self._epoch)
         # sys.exit()
-        #plot images of the clusters
-        array_pseudo_labels = np.array(pseudo_labels[0])
-        mapping = {}
-        for i in np.unique(array_pseudo_labels):
-            mapping[i] = np.where(array_pseudo_labels == i)[0]  
-        for key in mapping.keys():
-            images_to_show = []
-            for n,index in enumerate(mapping[key]):
-                try:
-                    image = self.train_sets[0]._get_single_item(index,for_sim=True)["img"]
-                    images_to_show.append(image)
-                except:
-                    pass
-                if n >20:
-                    break
-            try:
-                images_to_show = torchvision.utils.make_grid(images_to_show)
-                # self.writer.add_image(' images target source cluster '+ str(key), images_to_show, self._epoch)
-            except:
-                pass
-
         # print("pseudo labels : {}".format(pseudo_labels))
         # update train loader
         self.train_loader, self.train_sets = build_train_dataloader(
@@ -485,19 +447,17 @@ class BaseRunner(object):
                 #     except:
                 #         batch_protos2 = self.iter_protos2.next()  #python3.9
             if self.scaler is None:
-                with torch.autograd.set_detect_anomaly(True):
-                    if self.protos_dataloader is None:
-                        loss = self.train_step(iter, batch)
+                if self.protos_dataloader is None:
+                    loss = self.train_step(iter, batch)
+                else:
+                    if self.train_loader_target is None:
+                        loss = self.train_step(iter, batch, batch_protos)
                     else:
-                        if self.train_loader_target is None:
-                            loss = self.train_step(iter, batch, batch_protos)
-                        else:
-                            loss = self.train_step(iter, batch, batch_protos, batch_target=batch_target)
-                    if (loss > 0):
-                        self.optimizer.zero_grad()
-                        #with torch.autograd.set_detect_anomaly(False):
-                        loss.backward()
-                        self.optimizer.step()
+                        loss = self.train_step(iter, batch, batch_protos, batch_target=batch_target)
+                if (loss > 0):
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    self.optimizer.step()
 
             else:
                 with autocast():
@@ -724,7 +684,9 @@ class BaseRunner(object):
                 k = k.replace('base.','')
             if 'head' in k or 'dist' in k or 'pre_logits' in k:
                 continue
-            if 'fc.' in k or 'classifier' in k or 'bottleneck' in k:
+            # classifier heads are personal to each client; the BN neck is part
+            # of the aggregated model and is kept
+            if 'fc.' in k or 'classifier' in k:
                 continue
             if 'patch_embed.proj.weight' in k and len(v.shape) < 4:
                 # For old models that I trained prior to conv based patchification

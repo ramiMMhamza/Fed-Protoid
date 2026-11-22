@@ -37,7 +37,6 @@ def build_bakcbone(name,backbone_path, pretrained=True, *args, **kwargs):
     """
     if name not in __factory:
         raise KeyError("Unknown backbone:", name)
-    if backbone_path=="":
-        return __factory[name](pretrained=pretrained, *args, **kwargs)
-    else:
-        return __factory[name](backbone_path,pretrained=pretrained, *args, **kwargs)
+    if backbone_path and name in ("resnet18", "resnet34", "resnet50", "resnet101", "resnet152"):
+        return __factory[name](backbone_path, *args, pretrained=pretrained, **kwargs)
+    return __factory[name](*args, pretrained=pretrained, **kwargs)

@@ -621,7 +621,6 @@ def build_val_dataloader_source(
 
     data_root = cfg.DATA_ROOT  # PATH, str
     dataset_names = list(cfg.TRAIN.datasets.keys())  # list of str
-    filtration = cfg.TRAIN.filtre  # list or None of dataset to divide into tasks
     if for_clustering:
         dataset_modes = list(cfg.TRAIN.datasets.values())  # list of str
         if all_datasets:
@@ -704,7 +703,6 @@ def build_val_dataloader(
 
     data_root = cfg.DATA_ROOT  # PATH, str
     dataset_names = list(cfg.TRAIN.datasets.keys())  # list of str
-    filtration = cfg.TRAIN.filtre  # list or None of dataset to divide into tasks
     if for_clustering:
         dataset_modes = list(cfg.TRAIN.datasets.values())  # list of str
         if all_datasets:

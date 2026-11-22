@@ -129,11 +129,11 @@ def test_reid(
     end_time = time.monotonic()
     print("Testing time: ", timedelta(seconds=end_time - start_time))
     print(f"\n{sep} Finished testing {sep}\n")
-    if cfg.exec==0:
-        save_dir = osp.join(cfg.work_dir, 'visrankactiv_'+str(cfg.task_id)+'_'+dataset_name)
-    else:
-        save_dir = '/out/visrankactiv_'+str(cfg.task_id)+'_'+dataset_name
     if visrankactiv and rank==0:
+            save_dir = osp.join(
+                cfg.work_dir,
+                'visrankactiv_' + str(cfg.get('task_id', 0)) + '_' + str(dataset_name),
+            )
             visualize_ranked_activation_results(
                 dist,
                 qa,

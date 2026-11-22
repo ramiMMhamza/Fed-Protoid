@@ -95,66 +95,7 @@ class TripletLoss(nn.Module):
             .eq(all_targets.view(M, 1).expand(M, N).t())
             .float()
         )
-  
-        dist_ap, dist_an = _batch_hard(mat_dist, mat_sim)
-        assert dist_an.size(0) == dist_ap.size(0)
-        y = torch.ones_like(dist_ap)
-        # loss = F.margin_ranking_loss(dist_an, dist_ap, y, margin=self.margin)
-        loss = self.margin_ranking_loss(dist_an, dist_ap, y)
-        # prec = (dist_an.data > dist_ap.data).sum() * 1. / y.size(0)
-        return loss
 
-class TripletLossProtos(nn.Module):
-    """
-    Compute Triplet loss augmented with Batch Hard
-    Details can be seen in 'In defense of the Triplet Loss for Person Re-Identification'
-    """
-
-    __dist_factory = {
-        "euclidean": euclidean_dist,
-        "cosine": cosine_dist,
-    }
-
-    def __init__(self, margin=0.3, dist_metric="euclidean", triplet_key="pooling"):
-        super(TripletLossProtos, self).__init__()
-        self.margin = margin
-        self.triplet_key = triplet_key
-        self.dist_metric = self.__dist_factory[dist_metric]
-        self.rank, self.world_size, self.dist = get_dist_info()
-
-        self.margin_ranking_loss = nn.MarginRankingLoss(margin=margin)
-        self.logsoftmax = nn.LogSoftmax(dim=1)
-        self.softmax = nn.Softmax(dim=1)
-
-    def forward(self, results, targets):
-
-        emb = results[self.triplet_key]
-
-        if self.dist:
-            all_emb = [torch.empty_like(emb) for _ in range(self.world_size)]
-            dist.all_gather(all_emb, emb)
-            all_emb = torch.cat(all_emb).detach()
-
-            all_targets = [torch.empty_like(targets) for _ in range(self.world_size)]
-            dist.all_gather(all_targets, targets)
-            all_targets = torch.cat(all_targets).detach()
-        else:
-            all_emb = emb.detach()
-            all_targets = targets.detach()
-
-        # mat_dist = self.dist_metric(emb, emb)
-        mat_dist = self.dist_metric(emb, all_emb)
-        mat_dist_protos = self.dist_metric(emb, pr)
-        # assert mat_dist.size(0) == mat_dist.size(1)
-        N, M = mat_dist.size()
-        # mat_sim = targets.expand(N, N).eq(targets.expand(N, N).t()).float()
-        mat_sim = (
-            targets.view(N, 1)
-            .expand(N, M)
-            .eq(all_targets.view(M, 1).expand(M, N).t())
-            .float()
-        )
-  
         dist_ap, dist_an = _batch_hard(mat_dist, mat_sim)
         assert dist_an.size(0) == dist_ap.size(0)
         y = torch.ones_like(dist_ap)
@@ -165,7 +106,7 @@ class TripletLossProtos(nn.Module):
 
 
 class SoftmaxTripletLoss(TripletLoss):
-    def forward(self, results, targets, protos=None):
+    def forward(self, results, targets):
 
         emb = results[self.triplet_key]
 
@@ -184,9 +125,6 @@ class SoftmaxTripletLoss(TripletLoss):
         # mat_dist = self.dist_metric(emb, emb)
         # assert (mat_dist.size(0) == mat_dist.size(1)), "debug"
         mat_dist = self.dist_metric(emb, all_emb)
-        if protos is not None:
-            mat_dist_protos = self.dist_metric(emb, protos)
-            dist_a_protos = torch.sort(mat_dist_protos,dim=1,descending=False)[0][:,0]
         N, M = mat_dist.size()
         # mat_sim = targets.expand(N, N).eq(targets.expand(N, N).t()).float()
         mat_sim = (
@@ -199,30 +137,12 @@ class SoftmaxTripletLoss(TripletLoss):
         dist_ap, dist_an, ap_idx, an_idx = _batch_hard(
             mat_dist, mat_sim, return_indices=True
         )
-        if protos is not None:
-            print(dist_an)
-            print(results)
-            print(mat_dist_protos)
-            torch.save(dist_a_protos,"dist_a_protos.pt")
-            torch.save(dist_ap,"dist_ap.pt")
-            torch.save(dist_an,"dist_an.pt")
-            torch.save(mat_dist_protos, "mat_dist_protos.pt")
-            sys.exit()
         assert dist_an.size(0) == dist_ap.size(0), "debug"
-        if protos is not None:
-            dist_an = torch.concat([dist_an,dist_a_protos])
-            triple_dist = torch.stack((dist_ap, dist_an,dist_a_protos), dim=1)
-        else:
-            triple_dist = torch.stack((dist_ap, dist_an), dim=1)
+        triple_dist = torch.stack((dist_ap, dist_an), dim=1)
         triple_dist = self.logsoftmax(triple_dist)
 
         # hard-label softmax triplet loss
-        if protos is not None:
-            loss = (
-            -self.margin * triple_dist[:, 0] - (1 - self.margin) * triple_dist[:, 1]
-        ).mean()
-        else:
-            loss = (
+        loss = (
             -self.margin * triple_dist[:, 0] - (1 - self.margin) * triple_dist[:, 1]
         ).mean()
         return loss

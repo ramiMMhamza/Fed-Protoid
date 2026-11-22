@@ -62,7 +62,7 @@ def eval_cuhk03(distmat, q_pids, g_pids, q_camids, g_camids, max_rank):
 
         cmc = 0.0
         for _repeat_idx in range(num_repeats):
-            mask = np.zeros(len(raw_cmc), dtype=np.bool)
+            mask = np.zeros(len(raw_cmc), dtype=bool)
             for _, idxs in g_pids_dict.items():
                 # randomly sample one image for each gallery person
                 rnd_idx = np.random.choice(idxs)
